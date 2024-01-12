@@ -1,0 +1,251 @@
+---
+title: "Bike_analysis"
+author: "Hiba"
+date: "2023-11-15"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This is the capstone project from the Google Data Analytics certificate. The following six phases of data analysis will guide the analysis:
+
+1. Ask
+2. Prepare
+3. Process
+4. Analyze
+5. Share
+6. Act
+
+## Ask
+
+#### About the company 
+
+Cyclistic stands out as a bike-share program with over 5,800 bicycles and 600 docking stations. They have two kinds of users: casual and annual members. The director of marketing believes the company’s future success depends on maximizing the number of annual memberships.
+
+#### Key stakeholders
+
+1. Lily Moreno: Director of marketing
+2. The Cyclistic executive team
+3. The Cyclistic marketing analytics team
+
+#### Business task
+Analyze the bike sharing company  Cyclistic's data from January 2023 to September 2023 to determine how annual members and casual riders use Cyclistic bikes differently.
+
+## Prepare
+
+#### Description of the data sources used
+The data has been made available online by Motivate International Inc. under this
+[license](https://divvybikes.com/data-license-agreement). Data-privacy issues prohibit us from using riders’ personally identifiable information, therefore, it has been removed. The data is current, comprehensive, reliable, and cited.
+
+I have used the data from January 2023 to September 2023.
+
+Download the dataset [here](https://divvy-tripdata.s3.amazonaws.com/index.html).
+
+## Process
+
+#### Import the data
+```{r}
+library(tidyverse)
+files <- list.files(path = "bike_data/")
+path_files <- paste("bike_data/",files, sep="")
+df <- read_csv(path_files)
+summary(df)
+```
+
+#### Clean and manipulate the data
+
+The data has been cleaned in the following ways:
+1. Missing values are dropped.
+2. Duplicates are removed.
+3. Rides with duration less than a minute or more than a day will are removed.
+
+The data has been manipulated in the following ways:
+1. A new column called ride_length to calculate the ride duration in seconds has been added.
+2. A column called start_day that contains the day the ride started has been added.
+3. A column called start_month that contains the month the ride started has been added
+
+```{r}
+library(tidyr)
+library(lubridate)
+# remove missing values and duplicates
+df_clean <- df %>% drop_na() %>% distinct()
+```
+
+```{r}
+# add a column called ride_length to calculate the ride duration in seconds
+# add a column start_day that contains the day the ride started e,g., Sun
+# add a column called start_month that contains the month the ride started e.g., Jan
+df_clean <- df_clean %>% mutate(ride_length = ended_at - started_at, start_day = wday(as.Date(started_at), label=TRUE), start_month = month(as.Date(started_at), label=TRUE))
+head(df_clean)
+```
+
+```{r}
+# check min and max of ride_duration as a range check
+min(df_clean$ride_length)
+max(df_clean$ride_length)
+```
+
+```{r}
+# remove instances where the duration is 0 or below
+df_clean <- df_clean %>% filter(ride_length > 0)
+# remove instances where duration is over 24*60*60
+df_clean <- df_clean %>% filter(ride_length <= (24*60*60))
+```
+
+## Analyze
+
+#### Determine maximum trip duration for each user type
+```{r}
+df_max_duration <- df_clean %>% group_by(member_casual) %>% summarize(max_trip_len = max(ride_length))
+df_max_duration
+```
+
+#### Find minimum trip duration for each user type
+```{r}
+df_min_duration <- df_clean %>% group_by(member_casual) %>% summarize(min_trip_len = min(ride_length))
+df_min_duration
+```
+
+#### Determine mean trip duration for each user type
+```{r}
+df_mean_duration <- df_clean %>% group_by(member_casual) %>% summarize(mean_trip_len = mean(ride_length))
+df_mean_duration
+```
+
+#### Find the day with most bike rides for each user type
+```{r}
+df_mode_day <- df_clean %>% group_by(member_casual) %>% count(start_day, sort = TRUE) %>% summarize(mode_day = start_day[1])
+df_mode_day
+```
+
+#### Determine the month with most bike rides for each user type
+```{r}
+df_mode_month <- df_clean %>% group_by(member_casual) %>% count(start_month, sort = TRUE) %>% summarize(mode_month = start_month[1])
+df_mode_month
+```
+
+#### Find the count of rides for each day for each user type
+```{r}
+df_count_day <- df_clean %>% group_by(member_casual, start_day) %>% count(start_day)
+df_count_day <- df_count_day %>% rename(count_of_trips = n)
+df_count_day
+```
+#### Find the average ride duration for each day for each user type
+```{r}
+df_dur_day <- df_clean %>% group_by(member_casual, start_day) %>% summarize(mean_trip_len = mean(ride_length), .groups = "drop")
+df_dur_day
+```
+
+#### Find the count of rides for each month for each user type
+```{r}
+df_count_month <- df_clean %>% group_by(member_casual, start_month) %>% count(start_month)
+df_count_month <- df_count_month %>% rename(count_of_trips = n)
+df_count_month
+```
+
+#### Determine the count of type of bikes for each user type
+```{r}
+df_count_type <- df_clean %>% group_by(member_casual) %>% count(rideable_type)
+df_count_type <- df_count_type %>% rename(count_of_trips = n)
+df_count_type
+```
+
+#### Determine the most popular start stations for casual users
+```{r}
+df_casual_start_stations <- df_clean %>% filter(member_casual == "casual") %>% count(start_station_name, sort = TRUE) %>% top_n(5)
+df_casual_start_stations <- df_casual_start_stations %>% rename(count_of_trips = n)
+df_casual_start_stations
+```
+
+#### Find the most popular start stations for members
+```{r}
+df_member_start_stations <- df_clean %>% filter(member_casual == "member") %>% count(start_station_name, sort = TRUE) %>% top_n(5)
+df_member_start_stations <- df_member_start_stations %>% rename(count_of_trips = n)
+df_member_start_stations
+```
+
+#### Find the most popular end stations for casual users
+```{r}
+df_casual_end_stations <- df_clean %>% filter(member_casual == "casual") %>% count(end_station_name, sort = TRUE) %>% top_n(5)
+df_casual_end_stations <- df_casual_end_stations %>% rename(count_of_trips = n)
+print(df_casual_end_stations)
+# creating auxiliary df for visualization
+x <- df_casual_start_stations
+x <- x %>% add_column(type = "start")
+x <- x %>% rename(station = start_station_name)
+y <- df_casual_end_stations
+y <- y %>% add_column(type = "end")
+y <- y %>% rename(station = end_station_name)
+df_casual_stations <- rbind(x, y)
+```
+
+#### Determine the most popular end stations for members
+```{r}
+df_member_end_stations <- df_clean %>% filter(member_casual == "member") %>% count(end_station_name, sort = TRUE) %>% top_n(5)
+df_member_end_stations <- df_member_end_stations %>% rename(count_of_trips = n)
+df_member_end_stations
+```
+
+## Share
+}
+```{r}
+str(df_dur_day)
+options(scipen = 999)
+df_dur_day$mean_trip_len <- as.numeric(df_dur_day$mean_trip_len)
+df_dur_day$mean_trip_len <- round(df_dur_day$mean_trip_len, 2)
+ggplot(data = df_dur_day, aes(x = start_day, y = mean_trip_len, fill = member_casual, label = mean_trip_len)) +
+  geom_bar(stat = "identity") +
+  geom_text(size = 3, position = position_stack(vjust = 0.5)) +
+  labs(title = "Average duration of bike trips per day for casual users and annual members", x = "Start day", y = "Average trip length", fill = "user type")
+```
+* On average, both casual users and annual members use bikes for longer duration on weekends.
+
+```{r}
+options(scipen = 999)
+
+ggplot(data = df_count_day, aes(x = start_day, y = count_of_trips, fill = member_casual, label = count_of_trips)) +
+  geom_bar(stat = "identity") +
+  geom_text(size = 3, position = position_stack(vjust = 0.5)) +
+  labs(title = "Count of bike trips per day for casual users and annual members", x = "Start day", y = "Count of trips", fill = "user type")
+```
+
+* Casual users use bikes more on weekends indicating that they likely rent bikes for leisure activities
+* Annual members tend to rent bikes more on weekdays indicating a more work-related usage.
+
+```{r}
+ggplot(data = df_count_month, aes(x = start_month, y = count_of_trips, fill = member_casual, label = count_of_trips)) +
+  geom_bar(stat = "identity") +
+  geom_text(size = 3, position = position_stack(vjust = 0.5)) +
+  labs(title = "Count of bike trips per month for casual users and annual members", x = "Start month", y = "Count of trips", fill = "user type")
+```
+
+* The month with most rides for casual users in July.
+* The month with most rides for annual members in August.
+
+```{r}
+ggplot(data = df_casual_stations, aes(x = station, y = count_of_trips, fill = type, label = count_of_trips)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  geom_text(size = 3, position = position_stack(vjust = 0.5)) +
+  labs(title = "The top 5 start and end stations for casual users", x = "Station", y = "Count of trips", fill = "type")
+
+```
+
+The top 5 start stations for casual users is same as their top 5 end stations.
+
+## Act
+
+The following recommendations to convert casual users into annual members are based on the above analysis:
+
+1. **Weekend Conversion Campaign**: Launch a targeted weekend conversion campaign that offers special incentives to casual users who switch to annual memberships. Promote the benefits of having year-round access to bikes on weekends, such as leisurely rides and family outings.
+
+2. **July Promotion**: Leverage the fact that casual users are most active in July. Run a limited-time promotion during this peak month, offering a significant discount on annual memberships, enticing casual users to commit to an annual plan during the period when they use bikes the most.
+
+3. **Top 5 Stations Targeting**: Concentrate marketing efforts on the top 5 stations where casual users frequently start and end their rides. Place eye-catching advertisements and offer on-site assistance to guide these users in the membership conversion process.
+
+By aligning Cyclistic's marketing strategies with these insights, the company can potentially boost our annual membership numbers and enhance overall customer retention.
